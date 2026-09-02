@@ -1,0 +1,68 @@
+<!-- //import layouts boilerplate.ejs -->
+<% layout("/layouts/boilerplate") %>
+
+    <section class="listings-page">
+        <!-- category filters -->
+        <% const categories = sports; //comes from constants.js via the controller %>
+        <div class="filters-row">
+            <a class="filter <%= category ? '' : 'filter-active' %>" href="/listings<%= q ? '?q=' + encodeURIComponent(q) : '' %>">
+                <i class="fa-solid fa-border-all"></i>
+                <p>All</p>
+            </a>
+            <% for (let c of categories) { %>
+                <a class="filter <%= category === c.name ? 'filter-active' : '' %>"
+                   href="/listings?category=<%= encodeURIComponent(c.name) %><%= q ? '&q=' + encodeURIComponent(q) : '' %>">
+                    <i class="fa-solid <%= c.icon %>"></i>
+                    <p><%= c.name %></p>
+                </a>
+            <% } %>
+
+            <!-- tax switch -->
+            <div class="tax-toggle">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="switchCheckDefault">
+                    <label class="form-check-label" for="switchCheckDefault">Display total after taxes</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="page-header">
+            <h3 class="page-title">
+                <% if (q) { %>
+                    Results for "<%= q %>"
+                <% } else if (category) { %>
+                    <%= category %>
+                <% } else { %>
+                    All listings
+                <% } %>
+                <span class="result-count"><%= allListings.length %> found</span>
+            </h3>
+            <a class="btn-primary" href="/listings/new">Create new listing</a>
+        </div>
+
+        <% if (allListings.length === 0) { %>
+            <p class="no-reviews">No listings matched. <a href="/listings">Clear filters</a></p>
+        <% } %>
+
+        <ul class="listing-list">
+            <% for(let listing of allListings) { %>
+                <% const imageUrl = listing.image && listing.image.url ? listing.image.url : listing.image; %>
+                <li class="listing-item">
+                    <div class="card listing-card">
+                        <a class="listing-card-link" href="/listings/<%= listing._id %>">
+                            <img class="card-img-top" src="<%= imageUrl %>" alt="<%= listing.title %>">
+                            <div class="card-body">
+                                <h5 class="card-title"><%= listing.title %></h5>
+                                <p class="card-text listing-place"><%= listing.location %> &middot; <%= listing.category %></p>
+                                <p class="card-text listing-price">
+                                    &#8377;<span class="price-amount" data-price="<%= listing.price || 0 %>"><%= (listing.price || 0).toLocaleString("en-IN") %></span>
+                                    <span class="per-night">/ hour</span>
+                                    <span class="tax-info"> &nbsp;+18% GST</span>
+                                </p>
+                            </div>
+                        </a>
+                    </div>
+                </li>
+            <% } %>
+        </ul>
+    </section>

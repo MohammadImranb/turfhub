@@ -1,0 +1,64 @@
+<!-- //import layouts boilerplate.ejs -->
+<% layout("/layouts/boilerplate") %>
+
+    <section class="form-page">
+        <h3 class="page-title">List a new turf</h3>
+        <form class="listing-form needs-validation" action="/listings" method="post" enctype="multipart/form-data" novalidate>
+            <label class="form-label">
+                Turf name
+                <input class="form-input" type="text" name="listing[title]" placeholder="e.g. Unkal Lakeside Turf" required>
+            </label>
+            <label class="form-label">
+                Description
+                <input class="form-input" type="text" name="listing[description]" placeholder="Surface, size, what makes it good" required>
+            </label>
+            <label class="form-label">
+                Price per hour (&#8377;)
+                <input class="form-input" type="number" name="listing[price]" placeholder="800" min="0" required>
+            </label>
+            <label class="form-label">
+                Area
+                <select class="form-input" name="listing[location]" required>
+                    <% for (let a of areas) { %>
+                        <option value="<%= a %>"><%= a %></option>
+                    <% } %>
+                </select>
+            </label>
+            <label class="form-label">
+                Sport
+                <select class="form-input" name="listing[category]" required>
+                    <% for (let s of sports) { %>
+                        <option value="<%= s.name %>"><%= s.name %></option>
+                    <% } %>
+                </select>
+            </label>
+            <label class="form-label">
+                Surface
+                <select class="form-input" name="listing[surface]">
+                    <% for (let s of surfaces) { %>
+                        <option value="<%= s %>"><%= s %></option>
+                    <% } %>
+                </select>
+            </label>
+            <label class="form-label">
+                Contact number
+                <input class="form-input" type="tel" name="listing[phone]" placeholder="+91 90000 00000">
+            </label>
+            <div class="form-label">
+                Amenities
+                <div class="amenity-grid">
+                    <% for (let a of amenities) { %>
+                        <label class="amenity-item">
+                            <input type="checkbox" name="listing[amenities]" value="<%= a %>">
+                            <span><%= a %></span>
+                        </label>
+                    <% } %>
+                </div>
+            </div>
+            <label class="form-label">
+                Turf photo
+                <input class="form-input" type="file" name="listing[image]" accept="image/png,image/jpeg,image/webp">
+            </label>
+            <button class="btn-primary" type="submit">List turf</button>
+        </form>
+    </section>

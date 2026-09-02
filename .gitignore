@@ -1,0 +1,20 @@
+node_modules/
+
+# secrets - never commit. .env.example documents the keys instead.
+.env
+.env.local
+.env.*.local
+
+# personal study notes (37MB of tldraw files), unrelated to this project
+Notes/
+
+# course practice code, not part of the app
+classroom/
+
+# editor / OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*

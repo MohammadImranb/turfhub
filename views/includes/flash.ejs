@@ -1,0 +1,19 @@
+<!-- flash messages - req.flash() returns an array, so loop it -->
+<!-- NOTE: use the bare `success`/`error`, NOT `locals.success`.
+     ejs-mate replaces `locals` with its own helper bag, so res.locals values
+     are only reachable as top level variables here. -->
+<% if (typeof success !== "undefined" && success.length) { %>
+    <% for (let msg of success) { %>
+        <div class="alert alert-success flash-msg" role="alert">
+            <i class="fa-solid fa-circle-check"></i> <%= msg %>
+        </div>
+    <% } %>
+<% } %>
+
+<% if (typeof error !== "undefined" && error.length) { %>
+    <% for (let msg of error) { %>
+        <div class="alert alert-danger flash-msg" role="alert">
+            <i class="fa-solid fa-circle-exclamation"></i> <%= msg %>
+        </div>
+    <% } %>
+<% } %>

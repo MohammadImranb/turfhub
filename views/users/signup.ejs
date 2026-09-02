@@ -1,0 +1,21 @@
+<!-- //import layouts boilerplate.ejs -->
+<% layout("/layouts/boilerplate") %>
+
+    <section class="form-page">
+        <h3 class="page-title">Sign up on Wanderlust</h3>
+        <form class="listing-form needs-validation" action="/signup" method="post" novalidate>
+            <label class="form-label">
+                Username
+                <input class="form-input" type="text" name="username" placeholder="Username" required>
+            </label>
+            <label class="form-label">
+                Email
+                <input class="form-input" type="email" name="email" placeholder="Email" required>
+            </label>
+            <label class="form-label">
+                Password
+                <input class="form-input" type="password" name="password" placeholder="Password" required>
+            </label>
+            <button class="btn-primary" type="submit">Sign up</button>
+        </form>
+    </section>

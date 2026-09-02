@@ -1,0 +1,47 @@
+<!-- //import layouts boilerplate.ejs -->
+<% layout("/layouts/boilerplate") %>
+
+    <section class="listings-page">
+        <div class="page-header">
+            <h3 class="page-title">My bookings <span class="result-count"><%= bookings.length %></span></h3>
+            <a class="btn-secondary" href="/bookings/manage">Bookings on my turfs</a>
+        </div>
+
+        <% if (bookings.length === 0) { %>
+            <p class="no-reviews">No bookings yet. <a href="/listings">Find a turf</a></p>
+        <% } %>
+
+        <ul class="booking-list">
+            <% for (let b of bookings) { %>
+                <% const upcoming = b.status === "confirmed" && b.date >= todayStr; %>
+                <li class="booking-card <%= b.status === 'cancelled' ? 'booking-cancelled' : '' %>">
+                    <div class="booking-main">
+                        <h5 class="booking-turf">
+                            <% if (b.turf) { %>
+                                <a href="/listings/<%= b.turf._id %>"><%= b.turf.title %></a>
+                            <% } else { %>
+                                (turf removed)
+                            <% } %>
+                        </h5>
+                        <p class="booking-when">
+                            <i class="fa-solid fa-calendar"></i> <%= b.date %>
+                            &nbsp;<i class="fa-solid fa-clock"></i> <%= minToLabel(b.startMin) %>&ndash;<%= minToLabel(b.endMin) %>
+                            <span class="booking-dur">(<%= ((b.endMin - b.startMin) / 60) %> hr)</span>
+                        </p>
+                        <% if (b.turf) { %>
+                            <p class="booking-where"><%= b.turf.location %> &middot; <%= b.turf.category %></p>
+                        <% } %>
+                    </div>
+                    <div class="booking-side">
+                        <span class="booking-price">&#8377;<%= b.totalPrice.toLocaleString("en-IN") %></span>
+                        <span class="booking-status status-<%= b.status %>"><%= b.status %></span>
+                        <% if (upcoming) { %>
+                            <form action="/bookings/<%= b._id %>?_method=DELETE" method="post">
+                                <button class="btn-danger btn-small" type="submit">Cancel</button>
+                            </form>
+                        <% } %>
+                    </div>
+                </li>
+            <% } %>
+        </ul>
+    </section>

@@ -1,0 +1,193 @@
+<!-- //import layouts boilerplate.ejs -->
+<% layout("/layouts/boilerplate") %>
+
+<section class="show-page">
+    <h3 class="page-title"><%= listing.title %></h3>
+    <% const imageUrl = listing.image && listing.image.url ? listing.image.url : listing.image; %>
+    <div class="card" style="max-width: 32rem;">
+        <img class="card-img-top" src="<%= imageUrl %>" alt="<%= listing.title %>">
+        <div class="card-body">
+            <p class="card-text"><%= listing.description %></p>
+            <p class="card-text"><strong>Price:</strong> &#8377;<%= listing.price ? listing.price.toLocaleString("en-IN") : "N/A" %> / hour</p>
+            <p class="card-text"><strong>Area:</strong> <%= listing.location %>, Hubballi</p>
+            <p class="card-text"><strong>Sport:</strong> <%= listing.category %><% if (listing.surface) { %> &middot; <%= listing.surface %><% } %></p>
+            <% const fmt = (m) => `${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`; %>
+            <p class="card-text"><strong>Open:</strong> <%= fmt(listing.openMin) %> &ndash; <%= fmt(listing.closeMin) %></p>
+            <% if (listing.phone) { %>
+                <p class="card-text"><strong>Contact:</strong> <%= listing.phone %></p>
+            <% } %>
+            <% if (listing.amenities && listing.amenities.length) { %>
+                <p class="card-text amenity-tags">
+                    <% for (let a of listing.amenities) { %><span class="amenity-tag"><%= a %></span><% } %>
+                </p>
+            <% } %>
+            <% if (listing.owner) { %>
+                <p class="card-text listing-owner">Hosted by <strong><%= listing.owner.username %></strong></p>
+            <% } %>
+        </div>
+    </div>
+    <% /* only the owner sees edit/delete */ %>
+    <% if (currentUser && listing.owner && listing.owner._id.equals(currentUser._id)) { %>
+        <div class="page-actions">
+            <a class="btn-secondary" href="/listings/<%= listing._id %>/edit">Edit listing</a>
+            <form class="delete-form" action="/listings/<%= listing._id %>?_method=DELETE" method="post">
+                <button class="btn-danger" type="submit">Delete listing</button>
+            </form>
+        </div>
+    <% } %>
+
+    <% if (listing.geometry && listing.geometry.coordinates && listing.geometry.coordinates.length === 2) { %>
+        <div class="map-section">
+            <h4 class="reviews-heading">Where you'll play</h4>
+            <div id="map"></div>
+            <p class="map-note"><%= listing.location %>, Hubballi &middot; approximate area location</p>
+        </div>
+
+        <%# handed to the browser as JSON so the client script never has to parse EJS %>
+        <script>
+          window.mapToken = "<%= mapToken %>";
+          window.turf = <%- JSON.stringify({
+            title: listing.title,
+            location: listing.location,
+            category: listing.category,
+            price: listing.price || 0,
+            coordinates: listing.geometry.coordinates
+          }) %>;
+        </script>
+        <script src="/js/map.js"></script>
+    <% } %>
+
+    <%
+      //build every bookable start block for this turf
+      const B = blockMinutes;
+      const startBlocks = [];
+      for (let m = listing.openMin; m + B <= listing.closeMin; m += B) {
+        const block = Math.floor(m / B);
+        const past = (date === today) && (m <= nowMin);
+        startBlocks.push({ min: m, block, taken: bookedBlocks.includes(block), past });
+      }
+      const freeCount = startBlocks.filter(s => !s.taken && !s.past).length;
+    %>
+    <div class="booking-section">
+        <h4 class="reviews-heading">Book this turf</h4>
+
+        <form class="date-form" action="/listings/<%= listing._id %>" method="get">
+            <label class="form-label date-label">
+                Date
+                <input class="form-input" type="date" name="date" value="<%= date %>" min="<%= today %>" onchange="this.form.submit()">
+            </label>
+            <noscript><button class="btn-secondary" type="submit">Check</button></noscript>
+        </form>
+
+        <p class="slot-summary">
+            <%= freeCount %> of <%= startBlocks.length %> slots free on <%= date %>
+            &middot; &#8377;<%= (listing.price || 0).toLocaleString("en-IN") %>/hour
+        </p>
+
+        <!-- visual timeline: grey = taken, faded = already passed -->
+        <div class="slot-strip">
+            <% for (let s of startBlocks) { %>
+                <span class="slot-cell <%= s.taken ? 'slot-taken' : (s.past ? 'slot-past' : 'slot-free') %>"
+                      title="<%= minToLabel(s.min) %> <%= s.taken ? '- booked' : (s.past ? '- passed' : '- available') %>">
+                    <%= minToLabel(s.min) %>
+                </span>
+            <% } %>
+        </div>
+
+        <% if (!currentUser) { %>
+            <p class="no-reviews"><a href="/login">Log in</a> to book a slot.</p>
+        <% } else if (listing.owner && listing.owner._id.equals(currentUser._id)) { %>
+            <%/* owners cannot book their own turf, so show them the manage link instead of a dead form */%>
+            <p class="no-reviews">This is your turf. See who has booked it under
+                <a href="/bookings/manage">Bookings on my turfs</a>.</p>
+        <% } else if (freeCount === 0) { %>
+            <p class="no-reviews">No slots left on this date. Try another day.</p>
+        <% } else { %>
+            <form class="booking-form" action="/listings/<%= listing._id %>/bookings" method="post"
+                  data-price="<%= listing.price || 0 %>" data-block="<%= B %>">
+                <input type="hidden" name="date" value="<%= date %>">
+                <label class="form-label">
+                    Start
+                    <select class="form-input" name="startMin" id="startMin" required>
+                        <% for (let s of startBlocks) { %>
+                            <option value="<%= s.min %>" <%= (s.taken || s.past) ? "disabled" : "" %>>
+                                <%= minToLabel(s.min) %><%= s.taken ? " (booked)" : (s.past ? " (passed)" : "") %>
+                            </option>
+                        <% } %>
+                    </select>
+                </label>
+                <label class="form-label">
+                    End
+                    <select class="form-input" name="endMin" id="endMin" required>
+                        <% for (let m = listing.openMin + B; m <= listing.closeMin; m += B) { %>
+                            <option value="<%= m %>"><%= minToLabel(m) %></option>
+                        <% } %>
+                    </select>
+                </label>
+                <p class="booking-total">Total: <strong id="bookingTotal">&#8377;0</strong></p>
+                <button class="btn-primary" type="submit">Confirm booking</button>
+            </form>
+        <% } %>
+    </div>
+
+    <div class="reviews-section">
+        <% if (!currentUser) { %>
+            <p class="no-reviews"><a href="/login">Log in</a> to leave a review.</p>
+        <% } else { %>
+        <h4 class="reviews-heading">Leave a review</h4>
+        <form class="review-form needs-validation" action="/listings/<%= listing._id %>/reviews" method="POST" novalidate>
+            <fieldset class="starability">
+                <legend class="starability-legend">Rating</legend>
+                <!-- stars need their own flex box, otherwise the legend becomes a flex item and sits beside them -->
+                <div class="starability-stars">
+                    <!-- radios run 5 -> 1 in the DOM, CSS flips them visually so the sibling selector can fill stars -->
+                    <% for(let star = 5; star >= 1; star--) { %>
+                        <% const starLabel = star + (star > 1 ? " stars" : " star"); %>
+                        <input type="radio" id="rate<%= star %>" name="review[rating]" value="<%= star %>" required>
+                        <label for="rate<%= star %>" title="<%= starLabel %>"><%= starLabel %></label>
+                    <% } %>
+                </div>
+            </fieldset>
+
+            <label class="form-label" for="comment">
+                Comment
+                <textarea class="form-input" name="review[comment]" id="comment" rows="4" placeholder="Share your experience..." required></textarea>
+            </label>
+
+            <button class="btn-primary" type="submit">Submit review</button>
+        </form>
+        <% } %>
+
+        <h4 class="reviews-heading">All Reviews</h4>
+        <% if (listing.reviews.length === 0) { %>
+            <p class="no-reviews">No reviews yet. Be the first to leave one!</p>
+        <% } %>
+        <ul class="review-list">
+            <% for(let review of listing.reviews) { %>
+                <li class="review-card">
+                    <div class="review-card-head">
+                        <span class="review-stars" aria-label="<%= review.rating %> out of 5 stars">
+                            <% for(let i = 1; i <= 5; i++) { %>
+                                <i class="fa-solid fa-star <%= i <= review.rating ? 'star-filled' : 'star-empty' %>"></i>
+                            <% } %>
+                        </span>
+                        <% if (review.createdAt) { %>
+                            <span class="review-date"><%= review.createdAt.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) %></span>
+                        <% } %>
+                    </div>
+                    <% if (review.author) { %>
+                        <p class="review-author">@<%= review.author.username %></p>
+                    <% } %>
+                    <p class="review-comment"><%= review.comment %></p>
+                    <% /* only the author sees delete */ %>
+                    <% if (currentUser && review.author && review.author._id.equals(currentUser._id)) { %>
+                        <!-- form for delete review -->
+                        <form action="/listings/<%= listing._id %>/reviews/<%= review._id %>?_method=DELETE" method="POST">
+                            <button class="btn-danger btn-small" type="submit">Delete review</button>
+                        </form>
+                    <% } %>
+                </li>
+            <% } %>
+        </ul>
+    </div>
+</section>
