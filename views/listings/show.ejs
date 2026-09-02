@@ -39,21 +39,20 @@
     <% if (listing.geometry && listing.geometry.coordinates && listing.geometry.coordinates.length === 2) { %>
         <div class="map-section">
             <h4 class="reviews-heading">Where you'll play</h4>
-            <div id="map"></div>
+            <%# data passed via attributes, not an inline <script>, so the Content Security
+                Policy can forbid inline scripts entirely - which is what makes CSP worth having %>
+            <div id="map"
+                 data-token="<%= mapToken %>"
+                 data-turf="<%= JSON.stringify({
+                    title: listing.title,
+                    location: listing.location,
+                    category: listing.category,
+                    price: listing.price || 0,
+                    coordinates: listing.geometry.coordinates
+                 }) %>"></div>
             <p class="map-note"><%= listing.location %>, Hubballi &middot; approximate area location</p>
         </div>
 
-        <%# handed to the browser as JSON so the client script never has to parse EJS %>
-        <script>
-          window.mapToken = "<%= mapToken %>";
-          window.turf = <%- JSON.stringify({
-            title: listing.title,
-            location: listing.location,
-            category: listing.category,
-            price: listing.price || 0,
-            coordinates: listing.geometry.coordinates
-          }) %>;
-        </script>
         <script src="/js/map.js"></script>
     <% } %>
 

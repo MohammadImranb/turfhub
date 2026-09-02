@@ -21,6 +21,7 @@ const session = require("express-session");
 const flash = require("connect-flash");
 //v6 is ESM-first, so the class sits on .MongoStore (v4/v5 exported it directly)
 const { MongoStore } = require("connect-mongo");
+const helmet = require("helmet");
 const passport = require("passport");
 const LocalStrategy = require("passport-local");
 const User = require("./models/user.js");
@@ -36,10 +37,72 @@ async function main() {
   await mongoose.connect(dbUrl);
 }
 
+//Security headers. The Content Security Policy has to name every external origin the
+//app loads from, otherwise the browser blocks Bootstrap, Font Awesome, Mapbox and the
+//images, and the site renders as unstyled text with no map.
+const scriptSrcUrls = ["https://api.mapbox.com/", "https://cdn.jsdelivr.net/", "https://cdnjs.cloudflare.com/"];
+const styleSrcUrls  = ["https://api.mapbox.com/", "https://cdn.jsdelivr.net/", "https://cdnjs.cloudflare.com/"];
+const connectSrcUrls = ["https://api.mapbox.com/", "https://*.tiles.mapbox.com/", "https://events.mapbox.com/"];
+const fontSrcUrls   = ["https://cdnjs.cloudflare.com/"];
+
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: [],
+      connectSrc: ["'self'", ...connectSrcUrls],
+      //no 'unsafe-inline' here on purpose - the map data moved to data-* attributes
+      //so nothing in this app needs an inline <script>
+      scriptSrc: ["'self'", ...scriptSrcUrls],
+      //styles still need it: a few templates use inline style="" attributes.
+      //Inline style is far less dangerous than inline script.
+      styleSrc: ["'self'", "'unsafe-inline'", ...styleSrcUrls],
+      workerSrc: ["'self'", "blob:"],  //Mapbox GL renders tiles in a web worker
+      childSrc: ["blob:"],
+      objectSrc: [],
+      imgSrc: [
+        "'self'",
+        "blob:",
+        "data:",
+        "https://res.cloudinary.com/",   //uploaded turf photos
+        "https://images.unsplash.com/"   //default/seed images
+      ],
+      fontSrc: ["'self'", ...fontSrcUrls]
+    }
+  },
+  //Mapbox fetches tiles cross-origin; the strictest COEP breaks that
+  crossOriginEmbedderPolicy: false
+}));
+
+//Render (and most hosts) put a reverse proxy in front of the app and terminate HTTPS there,
+//so Express sees a plain HTTP connection. Without this, req.secure is false and a
+//"secure" session cookie is never sent - the user logs in and is immediately logged out.
+app.set("trust proxy", 1);
+
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 app.use(express.urlencoded({ extended: true }));
 app.use(methodOverride("_method"));
+//Strip MongoDB operator keys ($ne, $gt, $where, ...) out of request bodies before they can
+//reach a query. Joi already rejects them on every route that has a schema, and Express 5's
+//default "simple" query parser cannot build nested objects from a query string at all - but
+//this closes the whole class of bug rather than relying on each new route remembering Joi.
+//NOTE: express-mongo-sanitize is not used because it reassigns req.query, which is a
+//getter in Express 5 and throws.
+function stripOperators(value) {
+  if (!value || typeof value !== "object") return;
+  for (const key of Object.keys(value)) {
+    if (key.startsWith("$") || key === "__proto__") {
+      delete value[key];
+    } else {
+      stripOperators(value[key]);
+    }
+  }
+}
+app.use((req, res, next) => {
+  stripOperators(req.body);
+  next();
+});
+
 app.engine("ejs", ejsMate); // to use ejs-mate for all .ejs files
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -76,7 +139,13 @@ const sessionoptions=
   //false so we don't write a session document for every anonymous visitor and bot
   saveUninitialized:false,
   cookie:{
-    httpOnly:true,
+    httpOnly:true, //JavaScript cannot read the cookie, so XSS cannot steal the session
+    //Render terminates TLS at its proxy, so only send the cookie over HTTPS in production.
+    //Locally we serve plain HTTP, so forcing secure here would stop login working at all.
+    secure: process.env.NODE_ENV === "production",
+    //"lax" still sends the cookie on normal link navigation but not on cross-site
+    //form posts, which blocks the simplest CSRF attacks
+    sameSite: "lax",
     maxAge:1000*60*60*24*7
   }
 }

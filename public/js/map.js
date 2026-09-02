@@ -1,16 +1,21 @@
 // Renders the turf location map on the show page.
-// window.mapToken and window.turf are set inline by show.ejs just above this script.
+// The token and turf data arrive as data-* attributes on #map rather than an inline
+// <script>, so the CSP can block inline scripts outright.
 (() => {
   'use strict'
 
-  if (!window.mapboxgl || !window.mapToken || !window.turf) return
   const el = document.getElementById('map')
-  if (!el) return
+  if (!el || !window.mapboxgl) return
 
-  mapboxgl.accessToken = window.mapToken
+  const token = el.dataset.token
+  let t
+  try { t = JSON.parse(el.dataset.turf) } catch { return }
+  if (!token || !t || !t.coordinates) return
+
+  mapboxgl.accessToken = token
 
   // GeoJSON order: [longitude, latitude]. Mapbox expects the same, so no swapping.
-  const coords = window.turf.coordinates
+  const coords = t.coordinates
 
   const map = new mapboxgl.Map({
     container: 'map',
@@ -21,7 +26,6 @@
 
   map.addControl(new mapboxgl.NavigationControl(), 'top-right')
 
-  const t = window.turf
   const popup = new mapboxgl.Popup({ offset: 28, closeButton: false }).setHTML(
     // build with textContent-safe escaping rather than raw interpolation
     `<div class="map-popup">
