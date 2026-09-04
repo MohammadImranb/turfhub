@@ -106,6 +106,20 @@ app.use((req, res, next) => {
 app.engine("ejs", ejsMate); // to use ejs-mate for all .ejs files
 app.use(express.static(path.join(__dirname, "public")));
 
+//Health endpoint for the Docker HEALTHCHECK and Kubernetes liveness/readiness probes.
+//Deliberately mounted BEFORE the session middleware so probe traffic never touches the
+//session store. It reports the database connection state, not just "the process is up" -
+//a Node process can be running happily while unable to serve a single real request.
+app.get("/healthz", (req, res) => {
+  const states = ["disconnected", "connected", "connecting", "disconnecting"];
+  const ready = mongoose.connection.readyState === 1;
+  res.status(ready ? 200 : 503).json({
+    status: ready ? "ok" : "degraded",
+    db: states[mongoose.connection.readyState] || "unknown",
+    uptime: Math.round(process.uptime())
+  });
+});
+
 
 //The session secret signs the session cookie. Anyone who knows it can forge a login,
 //so it must never sit in the repo - it comes from .env locally and from the host in production.
@@ -202,8 +216,17 @@ app.use((err, req, res, next) => {
 //more specific bind than our 0.0.0.0:8080, so Windows sends every localhost request to
 //Oracle and you get confusing 404s. Hosts like Render set PORT themselves.
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`server is listening on port ${PORT}`);
-});
+
+//Only bind a port when this file is run directly (node app.js / npm start).
+//When the test suite requires it, supertest drives the app object in-process on an
+//ephemeral port instead - binding 3000 here would make tests fail if the dev server
+//or the container were already using it.
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`server is listening on port ${PORT}`);
+  });
+}
+
+module.exports = app;
 
 

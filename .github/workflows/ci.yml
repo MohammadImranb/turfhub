@@ -1,0 +1,102 @@
+name: CI
+
+# Runs on every push and pull request to main. Catching a broken build here is the
+# whole point of CI - the alternative is finding out after it is deployed.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    # A real MongoDB, started by GitHub as a sidecar container and torn down after.
+    # The tests rely on a unique compound index to prevent double-booking, and only a
+    # genuine mongod enforces that - an in-process mock would pass while production broke.
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        # Without a health check the job can start before mongod is accepting
+        # connections, producing a flaky "connection refused" on a good commit.
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ping:1})'"
+          --health-interval 10s
+          --health-timeout 20s
+          --health-retries 10
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          # Caches ~/.npm keyed on package-lock.json, so unchanged dependencies are
+          # restored instead of re-downloaded on every run.
+          cache: npm
+
+      # npm ci, not npm install: installs exactly what the lockfile pins and fails if
+      # package.json and package-lock.json disagree. CI should be reproducible.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test:ci
+        env:
+          # Points the suite at the service container above. setup.js also refuses to
+          # run unless the database name contains "test".
+          MONGO_TEST_URL: mongodb://127.0.0.1:27017/turfhub_test
+          NODE_ENV: test
+          # Dummy value: the app throws on a missing SECRET, but nothing in the test
+          # suite depends on it being the real one. No repository secrets needed.
+          SECRET: ci-test-secret-not-a-real-credential
+
+  docker:
+    name: Docker build
+    runs-on: ubuntu-latest
+    # Only build the image if the tests passed - no point publishing a broken one.
+    needs: test
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Proves the Dockerfile still builds on a clean machine. Not pushed anywhere:
+      # publishing needs registry credentials, and this pipeline deliberately requires
+      # no secrets at all.
+      - name: Build the image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: turfhub:ci
+          # Reuses layers between runs so unchanged dependencies are not rebuilt.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify the image runs as a non-root user
+        run: |
+          docker build -t turfhub:verify .
+          USER_ID=$(docker run --rm --entrypoint id turfhub:verify -u)
+          echo "container uid: $USER_ID"
+          if [ "$USER_ID" = "0" ]; then
+            echo "FAIL: image runs as root"
+            exit 1
+          fi
+
+      - name: Verify no .env was baked into the image
+        run: |
+          if docker run --rm --entrypoint sh turfhub:verify -c "test -f /app/.env"; then
+            echo "FAIL: .env is inside the image"
+            exit 1
+          fi
+          echo "OK: no .env in image"

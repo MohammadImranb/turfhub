@@ -10,7 +10,7 @@ const sampleTurfs = [
       "Multi-sport arena in Railway Colony with a full size box cricket cage and a 7-a-side football turf. Floodlit till late, popular for weekend corporate matches.",
     image: {
       filename: "turfimage",
-      url: "https://images.unsplash.com/photo-1529900748604-07564a03e7f6?auto=format&fit=crop&w=800&q=60",
+      url: "https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&w=800&q=60",
     },
     price: 1100,
     location: "Railway Colony",
@@ -214,7 +214,7 @@ const sampleTurfs = [
       "Five-a-side football turf tucked behind the main Keshwapur market. Cash and UPI accepted at the gate.",
     image: {
       filename: "turfimage",
-      url: "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=800&q=60",
+      url: "https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?auto=format&fit=crop&w=800&q=60",
     },
     price: 800,
     location: "Keshwapur",

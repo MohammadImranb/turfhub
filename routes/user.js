@@ -13,6 +13,10 @@ const authLimiter = rateLimit({
   limit: 10,                //10 attempts per IP per window
   standardHeaders: "draft-7",
   legacyHeaders: false,
+  //The test suite signs up many users from 127.0.0.1 and would trip this cap, so every
+  //test after the tenth signup would fail for the wrong reason. Checked per request
+  //rather than at startup so a dedicated test can still exercise the limiter.
+  skip: () => process.env.NODE_ENV === "test",
   //a plain 429 body would be a dead end, so send them back with a flash message
   handler: (req, res) => {
     req.flash("error", "Too many attempts. Please try again in 15 minutes.");

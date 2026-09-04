@@ -1,9 +1,12 @@
 # TurfHub
 
+[![CI](https://github.com/MohammadImranb/turfhub/actions/workflows/ci.yml/badge.svg)](https://github.com/MohammadImranb/turfhub/actions/workflows/ci.yml)
+
 A sports turf booking platform for Hubballi–Dharwad. Browse venues by sport and area,
 see live slot availability, and book any 30-minute-aligned window.
 
-Built with Node.js, Express, MongoDB and EJS.
+Built with Node.js, Express, MongoDB and EJS. Containerised with Docker, tested with
+Jest, and built on every push by GitHub Actions.
 
 ---
 
@@ -99,6 +102,60 @@ npm start                        # start the server on http://localhost:3000
 npm run seed                     # load the sample Hubballi turfs
 node init/backfillGeometry.js    # geocode them for the map
 ```
+
+## Running with Docker
+
+The compose stack is self-contained — it runs its own MongoDB, so no Atlas account or
+API keys are needed:
+
+```bash
+docker compose up --build
+```
+
+Then open **http://127.0.0.1:3000** (use `127.0.0.1`, not `localhost` — on Windows,
+Docker Desktop's WSL relay holds the IPv6 loopback and `localhost` resolves to it first).
+
+Seed the containerised database:
+
+```bash
+docker compose exec app npm run seed
+```
+
+The image is built in two stages from `node:22-alpine`, runs as the unprivileged `node`
+user, excludes dev dependencies, and contains no secrets — configuration is supplied at
+run time, never baked into a layer.
+
+## Tests
+
+```bash
+npm test
+```
+
+Tests run against a **real MongoDB** (`turfhub_test`), not an in-process mock — the
+booking design depends on a unique compound index, and only a genuine mongod enforces
+that. `tests/setup.js` refuses to run unless the database name contains `test`.
+
+| Suite | Covers |
+|---|---|
+| `booking.concurrency.test.js` | 10 simultaneous requests for one slot produce exactly one booking; partial overlaps leave no orphaned locks; adjacent slots do not collide; cancelling frees the slot |
+| `authorization.test.js` | logged-out access is refused; a non-owner cannot edit or delete another user's listing or review; an owner cannot book their own turf; passwords are hashed and the hash is not exposed |
+
+Authorization tests assert against the **database**, not the HTTP status — a redirect
+does not prove the write was actually stopped.
+
+By default the suite expects MongoDB on `127.0.0.1:27017`. Override with
+`MONGO_TEST_URL` (for example `mongodb://127.0.0.1:27018/turfhub_test` to use the
+compose container).
+
+## CI
+
+`.github/workflows/ci.yml` runs on every push and pull request to `main`:
+
+1. **Test** — `npm ci`, then the suite against a `mongo:7` service container
+2. **Docker build** — only if the tests pass; also asserts the image does not run as
+   root and contains no `.env`
+
+The pipeline needs **no repository secrets**.
 
 ## Notes
 

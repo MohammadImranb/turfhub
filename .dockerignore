@@ -1,0 +1,42 @@
+# Everything listed here is excluded from the build context - the files Docker copies
+# to the daemon before building. Two reasons this matters:
+#
+# 1. SECURITY: without this, "COPY . ." would bake .env (Atlas password, session secret,
+#    Cloudinary secret, Mapbox token) into an image layer. Anyone who pulls the image can
+#    read it with "docker history" even if a later layer deletes the file.
+# 2. SPEED: node_modules and Notes/ are ~37MB+; sending them to the daemon on every build
+#    is wasted time, and node_modules built on Windows may not even work in a Linux image.
+
+# secrets
+.env
+.env.local
+.env.*.local
+
+# installed inside the image by npm ci, never copied from the host
+node_modules
+npm-debug.log*
+
+# version control and CI
+.git
+.gitignore
+.github
+
+# personal study notes, unrelated to the app
+Notes
+
+# docker's own files - not needed inside the image
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# kubernetes manifests
+k8s
+
+# editor / OS noise
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# docs
+README.md

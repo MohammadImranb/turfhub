@@ -1,0 +1,62 @@
+# Runs the whole stack locally: the app plus its own MongoDB.
+# Anyone can clone the repo and run "docker compose up" - no Atlas account, no API keys.
+#
+#   docker compose up --build      start it
+#   docker compose exec app sh     shell inside the app container
+#   docker compose logs -f app     follow the app logs
+#   docker compose down            stop (add -v to also delete the database volume)
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: turfhub-mongo
+    restart: unless-stopped
+    # Published so you can inspect the data with Compass on localhost:27018.
+    # 27018 on the host avoids clashing with a MongoDB already installed locally.
+    ports:
+      - "27018:27017"
+    volumes:
+      # Named volume. Without it the database is deleted with the container -
+      # containers are ephemeral, volumes are not.
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 15s
+      # mongosh is itself a Node app and takes several seconds just to start, especially
+      # on Windows/WSL2. A 5s timeout fails on mongosh's boot time even when the database
+      # is answering instantly, which marks a perfectly healthy container as unhealthy.
+      timeout: 20s
+      retries: 5
+      start_period: 40s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: turfhub-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      # "mongo" is the service name above. Compose puts both containers on the same
+      # network and runs a DNS server, so the hostname resolves to the mongo container.
+      # This is why we do not need an IP address anywhere.
+      ATLASDB_URL: mongodb://mongo:27017/turfhub
+      # Local-only values. Real secrets stay in .env and are never baked into the image.
+      SECRET: local-dev-compose-secret-not-used-in-production
+      # Left blank on purpose: the app runs fine without them, images fall back to the
+      # schema default and the map section is simply hidden when MAP_TOKEN is absent.
+      CLOUDINARY_CLOUD_NAME: ""
+      CLOUDINARY_KEY: ""
+      CLOUDINARY_SECRET: ""
+      MAP_TOKEN: ""
+    depends_on:
+      mongo:
+        # Wait for mongo to answer a ping, not merely to have started. Without this the
+        # app boots first, fails to connect, and exits before mongo is ready.
+        condition: service_healthy
+
+volumes:
+  mongo-data:
