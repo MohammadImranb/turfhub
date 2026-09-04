@@ -13,8 +13,9 @@
 // It always uses a SEPARATE database (turfhub_test) so running tests can never
 // touch development or production data.
 //
-// (mongodb-memory-server was the first choice but downloads a ~506MB mongod binary,
-// which is slow locally and wasteful in CI when a service container is one line.)
+// (mongodb-memory-server was tried first and removed: its postinstall downloads a
+// ~506MB mongod binary on every install, which is slow locally and would run on the
+// deployment host too. A service container in CI is one line and costs nothing.)
 
 const mongoose = require("mongoose");
 
