@@ -147,15 +147,19 @@ By default the suite expects MongoDB on `127.0.0.1:27017`. Override with
 `MONGO_TEST_URL` (for example `mongodb://127.0.0.1:27018/turfhub_test` to use the
 compose container).
 
-## CI
+## CI/CD
 
 `.github/workflows/ci.yml` runs on every push and pull request to `main`:
 
 1. **Test** — `npm ci`, then the suite against a `mongo:7` service container
 2. **Docker build** — only if the tests pass; also asserts the image does not run as
    root and contains no `.env`
+3. **Deploy** — only if both previous jobs pass, and only on a push to `main`
+   (never on a pull request). Triggers a Render deploy via a webhook.
 
-The pipeline needs **no repository secrets**.
+Deployment is **gated on the test suite**: a failing test stops the release rather than
+reaching production. The only secret the pipeline needs is `RENDER_DEPLOY_HOOK`; the
+test and build jobs need none at all.
 
 ## Notes
 

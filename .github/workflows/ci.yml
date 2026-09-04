@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD
 
 # Runs on every push and pull request to main. Catching a broken build here is the
 # whole point of CI - the alternative is finding out after it is deployed.
@@ -100,3 +100,21 @@ jobs:
             exit 1
           fi
           echo "OK: no .env in image"
+
+  deploy:
+    name: Deploy to Render
+    runs-on: ubuntu-latest
+    # The gate. This job only runs if BOTH previous jobs succeeded, so a failing test
+    # or a broken Dockerfile stops the release instead of reaching production.
+    needs: [test, docker]
+    # Pull requests must never deploy - only merged code on main.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Trigger Render deploy
+        # The hook URL is a credential (anyone holding it can deploy), so it lives in
+        # repository secrets and is never printed. --fail makes curl exit non-zero on
+        # an HTTP error, otherwise a rejected request would still "succeed" here.
+        run: |
+          curl --fail --silent --show-error -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
+          echo "Render deploy triggered"
